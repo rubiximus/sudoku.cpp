@@ -1,0 +1,11 @@
+sudoku.cpp - A sudoku solver implemented in C++ by Andrew Otto
+
+This is a port of my Racket sudoku implementation (github.com/rubiximus/sudoku.rkt). Right now the behavior is largely the same but I hope to add more constraints and optimize performance to make it solve 16x16 puzzles faster than current.
+
+
+How to run:
+./sudoku_solve input.txt
+
+input.txt should be a file with a series of numbers. The first number is the size of the puzzle (e.g. 9, 16) and the rest are the intial inputs. Like with sudoku.rkt, 0 is an empty cell.
+
+See included *.txt files for examples.
