@@ -3,19 +3,19 @@
 
 #include "sudoku.h"
 
-int n;
+int N;
 
 int** read_file(char* filename)
 {
 	FILE* input = fopen(filename, "r");
 
-	fscanf(input, "%d", &n);
+	fscanf(input, "%d", &N);
 
-	int** read_values = new int* [n];
-	for(int row = 0; row < n; row++)
+	int** read_values = new int* [N];
+	for(int row = 0; row < N; row++)
 	{
-		read_values[row] = new int[n];
-		for(int col = 0; col < n; col++)
+		read_values[row] = new int[N];
+		for(int col = 0; col < N; col++)
 		{
 			fscanf(input, "%d", &(read_values[row][col]));
 		}
@@ -30,18 +30,18 @@ void print_solution(int** solution)
 {
 	if(!solution) return;
 
-	int sqrt_n = (int) sqrt(n);
+	int sqrt_n = (int) sqrt(N);
 
-	for(int row = 0; row < n; row++)
+	for(int row = 0; row < N; row++)
 	{
-		for(int col = 0; col < n; col++)
+		for(int col = 0; col < N; col++)
 		{
 			printf("%d ", solution[row][col]);
-			if((col+1)%sqrt_n == 0 && col+1 != n)
+			if((col+1)%sqrt_n == 0 && col+1 != N)
 				printf(" ");
 		}
 		printf("\n");
-		if((row+1)%sqrt_n == 0 && row+1 != n)
+		if((row+1)%sqrt_n == 0 && row+1 != N)
 			printf("\n");
 	}
 }
@@ -60,13 +60,13 @@ int main(int argc, char* argv[])
 	printf("\ninput puzzle\n");
 	print_solution(puzzle);
 
-	Sudoku solver(n);
+	Sudoku solver(N);
 	solver.Solve(puzzle);
 	int** solution = solver.get_puzzle();
 	printf("\nsolution\n");
 	print_solution(solution);
 
-	for(int row = 0; row < n; row++)
+	for(int row = 0; row < N; row++)
 	{
 		delete[] puzzle[row];
 	}
