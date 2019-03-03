@@ -8,22 +8,45 @@ Sudoku::Sudoku(int puzzle_size)
 	puzzle = new int* [kSize];
 	num_possible_vals = new int* [kSize];
 	possible_vals = new bool** [kSize];
+	neighbors = new Pair** [kSize];
 
 	for(int row = 0; row < kSize; row++)
 	{
 		puzzle[row] = new int[kSize];
 		num_possible_vals[row] = new int[kSize];
 		possible_vals[row] = new bool* [kSize];
+		neighbors[row] = new Pair* [kSize];
 
 		for(int col = 0; col < kSize; col++)
 		{
 			puzzle[row][col] = 0;
 			num_possible_vals[row][col] = kSize;
 			possible_vals[row][col] = new bool[kSize];
+			neighbors[row][col] = new Pair[kSize * 3];
 
 			for(int value = 0; value < kSize; value++)
 			{
 				possible_vals[row][col][value] = true;
+			}
+
+			//populate neighbors for this cell
+			//this contains duplicates but that shouldn't be an issue
+			//this also contains each cell as its own neighbor, which is worse
+			int block_row = kSqrtSize * floor(row / kSqrtSize);
+			int block_col = kSqrtSize * floor(col / kSqrtSize);
+			for(int i = 0; i < kSize; i++)
+			{
+				//0 to (N-1): same row
+				neighbors[row][col][i].row = row;
+				neighbors[row][col][i].col = i;
+
+				//N to (2N-1): same col
+				neighbors[row][col][i + kSize].row = i;
+				neighbors[row][col][i + kSize].col = col;
+
+				//2N to (3N-1): same box, not same row or col
+				neighbors[row][col][i + 2 * kSize].row = block_row + i / kSqrtSize;
+				neighbors[row][col][i + 2 * kSize].col = block_col + i % kSqrtSize;
 			}
 		}
 	}
@@ -36,16 +59,19 @@ Sudoku::~Sudoku()
 		for(int col = 0; col < kSize; col++)
 		{
 			delete[] possible_vals[row][col];
+			delete[] neighbors[row][col];
 		}
-		
+
 		delete[] puzzle[row];
 		delete[] num_possible_vals[row];
 		delete[] possible_vals[row];
+		delete[] neighbors[row];
 	}
 
 	delete[] puzzle;
 	delete[] num_possible_vals;
 	delete[] possible_vals;
+	delete[] neighbors;
 }
 
 void Sudoku::Copy(const Sudoku& source)
@@ -101,7 +127,7 @@ bool Sudoku::SetOnly(int const* const* input_puzzle)
 		{
 			if(!Set(row, col, input_puzzle[row][col]))
 			{
-				DEBUG_OUT("error: puzzle not valid\n");
+				DEBUG_OUT("error: puzzle not valid: ");
 				DEBUG_OUT("row %d, col %d, value %d\n",
 						row, col, input_puzzle[row][col]);
 				return false;
@@ -129,7 +155,7 @@ bool Sudoku::Set(int row, int col, int value)
 	{
 		DEBUG_OUT("error: conflict setting\n");
 		DEBUG_OUT("row %d, col %d, value %d\n", row, col, value);
-		
+
 		for(int v = 0; v < kSize; v++)
 		{
 			DEBUG_OUT("%d", possible_vals[row][col][v]);
@@ -150,35 +176,14 @@ bool Sudoku::Set(int row, int col, int value)
 
 	//remove value as a possibility for all squares logically adjacent
 	//to (row, col), i.e. same row, col, or block
-	
-	//same col
-	for(int r = 0; r < kSize; r++)
+	for(int i = 0; i < kSize * 3; i++)
 	{
-		if(r != row)
-			if(!RemovePossibility(r, col, value))
-				return false;
-	}
-
-	//same row
-	for(int c = 0; c < kSize; c++)
-	{
-		if(c != col)
-			if(!RemovePossibility(row, c, value))
-				return false;
-	}
-
-	//same block
-	//this math works because the block has height/width of kSqrtSize
-	int block_row = (int)(kSqrtSize * floor(row / kSqrtSize));
-	int block_col = (int)(kSqrtSize * floor(col / kSqrtSize));
-	for(int r = block_row; r < block_row + kSqrtSize; r++)
-	{
-		for(int c = block_col; c < block_col + kSqrtSize; c++)
-		{
-			if(r != row && c != col)
-				if(!RemovePossibility(r, c, value))
-					return false;
-		}
+		Pair curr_neighbor = neighbors[row][col][i];
+		int r = curr_neighbor.row;
+		int c = curr_neighbor.col;
+		if((r != row || c != col) &&
+			!RemovePossibility(r, c, value))
+			return false;
 	}
 
 	return true;
@@ -200,7 +205,7 @@ bool Sudoku::RemovePossibility(int row, int col, int value)
 	//there is a contradiction
 	if(num_possible_vals[row][col] == 1)
 	{
-		DEBUG_OUT("error: RemovePossibility conflict\n");
+		DEBUG_OUT("error: RemovePossibility conflict: ");
 		DEBUG_OUT("row %d, col %d, value %d\n", row, col, value);
 		return false;
 	}
@@ -228,8 +233,48 @@ bool Sudoku::RemovePossibility(int row, int col, int value)
 //returns false if a contradiction occurred
 bool Sudoku::Search()
 {
+	bool changed = true;
+	while (changed)
+	{
+		changed = false;
+		for (int row = 0; row < kSize; row++)
+		{
+			for (int col = 0; col < kSize; col++)
+			{
+				if (num_possible_vals[row][col] == 1)
+					continue;
+
+				int counts[kSize] = {0};
+				for (int i = 0; i < kSize * 3; i++)
+				{
+					Pair neigh = neighbors[row][col][i];
+					if (neigh.row == row && neigh.col == col)
+						continue;
+
+					for (int value = 0; value < kSize; value++)
+					{
+						if (possible_vals[neigh.row][neigh.col][value])
+							counts[value]++;
+					}
+				}
+
+				for (int value = 0; value < kSize; value++)
+				{
+					if (possible_vals[row][col][value] &&
+						counts[value] == 0)
+					{
+						DEBUG_OUT("SET(%d, %d, %x)\n", row, col, value+1);
+						if (!Set(row, col, value+1))
+							return false;
+						changed = true;
+					}
+				}
+			}
+		}
+	}
+
 	//pick an unsolved square
-	Pair search_target = FindFirstUnsolved();
+	Pair search_target = FindMostSolvedOptimal();
 	int search_row = search_target.row;
 	int search_col = search_target.col;
 
@@ -243,15 +288,16 @@ bool Sudoku::Search()
 	//try all possibilities -- break loop if success
 	for(int value = 0; value < kSize; value++)
 	{
-		DEBUG_OUT("searching on %d, %d; value %d\n", search_row, search_col, value+1);
-
 		if(!possible_vals[search_row][search_col][value])
 		{
 			continue;
 		}
+
+		DEBUG_OUT("searching on %d, %d; value %d\n", search_row, search_col, value+1);
+
 		Sudoku current_branch(kSize);
 		current_branch.Copy(*this);
-		if(current_branch.Set(search_row, search_col, value+1) && 
+		if(current_branch.Set(search_row, search_col, value+1) &&
 		   current_branch.Search())
 		{
 			Copy(current_branch);
@@ -296,6 +342,7 @@ Pair Sudoku::FindLeastSolved()
 //finds the square with the fewest possibilities
 //
 //returns Pair with the row, col of the result
+
 Pair Sudoku::FindMostSolved()
 {
 	int min = kSize+1;
@@ -344,5 +391,175 @@ Pair Sudoku::FindFirstUnsolved()
 		}
 	}
 
+	return result;
+}
+/*
+Pair Sudoku::FindMostSolvedOptimal()
+{
+	int min_count = 3 * kSize * kSize + 1;
+	Pair result;
+	result.row = -1;
+	result.col = -1;
+
+	//reused for each cell
+	int* counts = new int[kSize];
+
+	//
+	for(int row = 0; row < kSize; row++)
+	{
+		for(int col = 0; col < kSize; col++)
+		{
+			if(num_possible_vals[row][col] > 1)
+			{
+				//find value with fewest dependencies
+				for(int value = 0; value < kSize; value++)
+				{
+					counts[value] = 0;
+				}
+
+				//check col
+				for(int r = 0; r < kSize; r++)
+				{
+					if(r == row)
+					{
+						continue;
+					}
+
+					for(int value = 0; value < kSize; value++)
+					{
+						if(possible_vals[r][col][value])
+						{
+							counts[value]++;
+						}
+					}
+				}
+
+				//check row
+				for(int c = 0; c < kSize; c++)
+				{
+					if(c == col)
+					{
+						continue;
+					}
+
+					for(int value = 0; value < kSize; value++)
+					{
+						if(possible_vals[row][c][value])
+						{
+							counts[value]++;
+						}
+					}
+				}
+
+				//check box
+				int block_row = (int)(kSqrtSize * floor(row / kSqrtSize));
+				int block_col = (int)(kSqrtSize * floor(col / kSqrtSize));
+				for(int r = block_row; r < block_row + kSqrtSize; r++)
+				{
+					for(int c = block_col; c < block_col + kSqrtSize; c++)
+					{
+						for(int value = 0; value < kSize; value++)
+						{
+							if(r != row && c != col &&
+							   possible_vals[r][c][value])
+							{
+								counts[value]++;
+							}
+						}
+					}
+				}
+
+				//find possible value with lowest count
+				int min_count2 = 3 * kSize * kSize + 1;
+				int min_value2 = -1;
+				for(int value = 0; value < kSize; value++)
+				{
+					if(possible_vals[row][col][value] &&
+					   counts[value] < min_count2)
+					{
+						min_count2 = counts[value];
+						min_value2 = value;
+					}
+				}
+
+				//check this dependency count against global min
+				if(min_count2 < min_count)
+				{
+					min_count = min_count2;
+					//min_value = min_value2;
+					result.row = row;
+					result.col = col;
+				}
+			}
+		}
+	}
+
+	delete[] counts;
+	return result;
+}
+*/
+//TODO: refactor this shiz
+Pair Sudoku::FindMostSolvedOptimal()
+{
+	int min = kSize * kSize + 1;
+	Pair result;
+	result.row = -1;
+	result.col = -1;
+
+	// find optimal value
+	int* counts = new int[kSize];
+	for(int value = 0; value < kSize; value++)
+	{
+		counts[value] = 0;
+	}
+
+	for(int row = 0; row < kSize; row++)
+	{
+		for(int col = 0; col < kSize; col++)
+		{
+			int num_poss_vals = num_possible_vals[row][col];
+			if(num_poss_vals > 1)
+			{
+				for(int value = 0; value < kSize; value++)
+				{
+					if(possible_vals[row][col][value])
+					{
+						counts[value]++;
+					}
+				}
+			}
+		}
+	}
+
+	int max_count = 0;
+	int max_value = 0;
+	for(int value = 0; value < kSize; value++)
+	{
+		if(counts[value] > max_count)
+		{
+			max_count = counts[value];
+			max_value = value;
+		}
+	}
+
+	//DEBUG_OUT("max_value %d", max_value);
+
+	// find most solved cell with optimal value
+	for(int row = 0; row < kSize; row++)
+	{
+		for(int col = 0; col < kSize; col++)
+		{
+			int current = num_possible_vals[row][col];
+			if(current < min && current > 1 &&
+			   possible_vals[row][col][max_value])
+			{
+				result.row = row;
+				result.col = col;
+				min = num_possible_vals[row][col];
+			}
+		}
+	}
+
+	delete[] counts;
 	return result;
 }

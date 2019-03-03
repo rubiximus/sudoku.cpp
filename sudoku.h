@@ -5,7 +5,7 @@
 #include <stdio.h>
 using namespace std;
 
-//#define DEBUG
+#define DEBUG
 #include "debug.h"
 
 //Pair struct used for returning row, col pairs from functions
@@ -57,7 +57,8 @@ class Sudoku
 		}
 
 	private:
-		int kSize, kSqrtSize; 
+		int kSize, kSqrtSize;
+		Pair*** neighbors;
 		bool*** possible_vals;
 		int** num_possible_vals;
 		int** puzzle;
@@ -70,7 +71,7 @@ class Sudoku
 		//
 		//returns false if a conflict occurs, true otherwise
 		bool Set(int row, int col, int value);
-		
+
 		//RemovePossibility
 		//helper for SetOnly
 		//removes value as a possibility for the square at row, col
@@ -100,6 +101,14 @@ class Sudoku
 		//returns Pair with the row, col of the result
 		Pair FindFirstUnsolved();
 
+		//FindMostSolvedOptimal
+		//helper for Search
+		//finds the square with the fewest possibilities that
+		//contains the most common unsolved value
+		//
+		//returns Pair with row, col of the result
+//		Pair FindMostSolvedOptimal(int &min_value);
+		Pair FindMostSolvedOptimal();
 };
 
 #endif //SUDOKU_H

@@ -1,5 +1,6 @@
 #include <math.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "sudoku.h"
 
@@ -36,7 +37,7 @@ void print_solution(int** solution)
 	{
 		for(int col = 0; col < N; col++)
 		{
-			printf("%d ", solution[row][col]);
+			printf("%2x ", solution[row][col]);
 			if((col+1)%sqrt_n == 0 && col+1 != N)
 				printf(" ");
 		}
@@ -54,6 +55,9 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
+	clock_t t;
+	t = clock();
+
 	char* filename = argv[1];
 
 	int** puzzle = read_file(filename);
@@ -65,6 +69,9 @@ int main(int argc, char* argv[])
 	int** solution = solver.get_puzzle();
 	printf("\nsolution\n");
 	print_solution(solution);
+
+	t = clock() - t;
+	printf("\n%f seconds\n", ((float)t)/CLOCKS_PER_SEC);
 
 	for(int row = 0; row < N; row++)
 	{
